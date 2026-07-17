@@ -290,6 +290,21 @@ If a fatal error occurs, such as a missing token, expired token, API failure, or
 
 `sgwnotify` does not currently extract tokens from Chrome or any browser profile. Provide the bearer token in config or with `--token`.
 
+### Getting a ShopGoodwill bearer token
+
+1. Log in to [ShopGoodwill](https://shopgoodwill.com) in your browser.
+2. Open any item page so the site makes its normal API requests.
+3. Open your browser's Developer Tools, then select the **Network** tab.
+4. Filter the requests to **Fetch/XHR**, and select a request to the ShopGoodwill buyer API (for example, a favorites request).
+5. In that request's headers, find the `Authorization` request header. Its value is `Bearer <token>`.
+6. Copy only the token after `Bearer `, then save it:
+
+```sh
+./sgwnotify config set-token "<token>"
+```
+
+Treat this token like a password: do not commit it, share it, or paste it into logs. It can expire, so repeat this process and update the saved token if `sgwnotify check-token` reports that it is unauthorized.
+
 ## Troubleshooting
 
 Check that the binary works:
