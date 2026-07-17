@@ -80,6 +80,16 @@ func TestRequestErrorReportsTimeout(t *testing.T) {
 	}
 }
 
+func TestParseFavoritesResponseTreatsNoFavoritesAsEmpty(t *testing.T) {
+	favorites, err := parseFavoritesResponse(response(http.StatusOK, `{"status":false,"message":"No favorites found"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(favorites) != 0 {
+		t.Fatalf("got %#v, want no favorites", favorites)
+	}
+}
+
 func response(status int, body string) *http.Response {
 	return &http.Response{
 		StatusCode: status,

@@ -165,6 +165,45 @@ func TestRunSuppressesDuplicateNotification(t *testing.T) {
 	}
 }
 
+func TestRunSilentlySkipsEmptyFavorites(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.json")
+	err := os.WriteFile(path, []byte(`{
+  "bearer_token": "a.b.c"
+}
+`), 0600)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	oldFetchFavoritesFunc := fetchFavoritesFunc
+	oldNotifyEndingFavoritesFunc := notifyEndingFavoritesFunc
+	defer func() {
+		fetchFavoritesFunc = oldFetchFavoritesFunc
+		notifyEndingFavoritesFunc = oldNotifyEndingFavoritesFunc
+	}()
+
+	fetchFavoritesFunc = func(token string, timeout time.Duration) ([]favorite, error) {
+		return []favorite{}, nil
+	}
+	notifications := 0
+	notifyEndingFavoritesFunc = func(favorites []favorite, skippedCount int, notificationOpenURL string) error {
+		notifications++
+		return nil
+	}
+
+	if err := Run(Options{
+		ConfigPath:              path,
+		DefaultLookaheadMinutes: 120,
+		DefaultOpenURL:          DefaultOpenURL,
+		DefaultHTTPTimeout:      15 * time.Second,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if notifications != 0 {
+		t.Fatalf("notifications got %d, want 0", notifications)
+	}
+}
+
 func TestRunRejectsBadTokenShape(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.json")
 	err := os.WriteFile(path, []byte(`{

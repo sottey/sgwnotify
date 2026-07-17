@@ -95,7 +95,6 @@ func Run(opts Options) error {
 		return err
 	}
 	if len(favorites) < 1 {
-		fmt.Println("No favorites found")
 		return nil
 	}
 	if opts.Verbose {

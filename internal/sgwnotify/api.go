@@ -86,7 +86,7 @@ func parseFavoritesResponse(resp *http.Response) ([]favorite, error) {
 		return nil, unauthorizedTokenError()
 	}
 	if !parsed.Status {
-		return nil, fmt.Errorf("No favorites found")
+		return []favorite{}, nil
 	}
 
 	return parsed.Data, nil
