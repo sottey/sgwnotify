@@ -27,6 +27,11 @@ func notifyEndingFavoritesWithSkipped(favorites []favorite, skipped int, openURL
 	return notify(title, body, openURL)
 }
 
+func notifyKeywordListings(listings []keywordListing) error {
+	title := fmt.Sprintf("%d new listing%s match your keywords", len(listings), plural(len(listings)))
+	return notify(title, keywordListingsBody(listings), DefaultOpenURL)
+}
+
 func NotifyError(err error) {
 	if err == nil {
 		return

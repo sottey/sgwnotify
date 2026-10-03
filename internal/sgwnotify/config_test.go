@@ -194,7 +194,7 @@ func TestShowConfigRedactsTokenAndShowsDefaults(t *testing.T) {
 	err := os.WriteFile(path, []byte(`{
   "bearer_token": "1234567890abcdef"
 }
-`), 0600)
+	`), 0600)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -217,5 +217,22 @@ func TestShowConfigRedactsTokenAndShowsDefaults(t *testing.T) {
 	}
 	if strings.Contains(got, "1234567890abcdef") {
 		t.Fatalf("output contains unredacted token:\n%s", got)
+	}
+}
+
+func TestSaveConfigKeywordsNormalizesAndRejectsDuplicates(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.json")
+	if err := SaveConfigKeywords(path, []string{" watch ", "Vintage"}); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := loadConfig(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := strings.Join(cfg.Keywords, ","), "watch,Vintage"; got != want {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+	if err := SaveConfigKeywords(path, []string{"watch", "WATCH"}); err == nil {
+		t.Fatal("expected duplicate keyword error")
 	}
 }

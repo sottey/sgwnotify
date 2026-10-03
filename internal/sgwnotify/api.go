@@ -1,6 +1,7 @@
 package sgwnotify
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -13,6 +14,7 @@ import (
 )
 
 const favoritesURL = "https://buyerapi.shopgoodwill.com/api/Favorite/GetAllFavoriteItemsByType?Type=all"
+const itemListingURL = "https://buyerapi.shopgoodwill.com/api/Search/ItemListing"
 const maxFavoritesAttempts = 3
 
 var doFavoritesRequestFunc = doFavoritesRequest
@@ -29,6 +31,112 @@ type favoritesResponse struct {
 	Status         bool       `json:"status"`
 	IsUnauthorized bool       `json:"isUnauthorized"`
 	Data           []favorite `json:"data"`
+}
+
+type listing struct {
+	ItemID    int64  `json:"itemId"`
+	Title     string `json:"title"`
+	StartTime string `json:"startTime"`
+	EndTime   string `json:"endTime"`
+}
+
+type itemListingResponse struct {
+	IsUnauthorized bool `json:"isUnauthorized"`
+	Data           struct {
+		Items []listing `json:"items"`
+	} `json:"data"`
+}
+
+type itemListingRequest struct {
+	CatIDs                          string `json:"catIds"`
+	CategoryID                      int    `json:"categoryId"`
+	CategoryLevel                   int    `json:"categoryLevel"`
+	CategoryLevelNo                 string `json:"categoryLevelNo"`
+	ClosedAuctionDaysBack           string `json:"closedAuctionDaysBack"`
+	ClosedAuctionEndingDate         string `json:"closedAuctionEndingDate"`
+	HighPrice                       string `json:"highPrice"`
+	IsFromHeaderMenuTab             bool   `json:"isFromHeaderMenuTab"`
+	IsFromHomePage                  bool   `json:"isFromHomePage"`
+	IsMultipleCategoryIDs           bool   `json:"isMultipleCategoryIds"`
+	IsSize                          bool   `json:"isSize"`
+	IsWeddingCategory               string `json:"isWeddingCatagory"`
+	Layout                          string `json:"layout"`
+	LowPrice                        string `json:"lowPrice"`
+	Page                            string `json:"page"`
+	PageSize                        string `json:"pageSize"`
+	PartNumber                      string `json:"partNumber"`
+	SavedSearchID                   int    `json:"savedSearchId"`
+	SearchBuyNowOnly                string `json:"searchBuyNowOnly"`
+	SearchCanadaShipping            string `json:"searchCanadaShipping"`
+	SearchClosedAuctions            string `json:"searchClosedAuctions"`
+	SearchDescriptions              string `json:"searchDescriptions"`
+	SearchInternationalShippingOnly string `json:"searchInternationalShippingOnly"`
+	SearchNoPickupOnly              string `json:"searchNoPickupOnly"`
+	SearchOneCentShippingOnly       string `json:"searchOneCentShippingOnly"`
+	SearchPickupOnly                string `json:"searchPickupOnly"`
+	SearchText                      string `json:"searchText"`
+	SearchUSOnlyShipping            string `json:"searchUSOnlyShipping"`
+	SelectedCategoryIDs             string `json:"selectedCategoryIds"`
+	SelectedGroup                   string `json:"selectedGroup"`
+	SelectedSellerIDs               string `json:"selectedSellerIds"`
+	SortColumn                      string `json:"sortColumn"`
+	SortDescending                  string `json:"sortDescending"`
+	UseBuyerPrefs                   string `json:"useBuyerPrefs"`
+}
+
+func fetchKeywordListings(token, keyword string, timeout time.Duration) ([]listing, error) {
+	payload, err := json.Marshal(defaultItemListingRequest(keyword))
+	if err != nil {
+		return nil, err
+	}
+	client := http.Client{Timeout: timeout}
+	for attempt := 1; attempt <= maxFavoritesAttempts; attempt++ {
+		resp, err := doItemListingRequest(&client, token, payload)
+		if err != nil {
+			if isTransientRequestError(err) && attempt < maxFavoritesAttempts {
+				continue
+			}
+			return nil, requestError(err, timeout)
+		}
+		if isTransientStatus(resp.StatusCode) && attempt < maxFavoritesAttempts {
+			resp.Body.Close()
+			continue
+		}
+		return parseItemListingResponse(resp)
+	}
+	return nil, fmt.Errorf("item listing request failed after %d attempts", maxFavoritesAttempts)
+}
+
+func defaultItemListingRequest(keyword string) itemListingRequest {
+	return itemListingRequest{CatIDs: "", CategoryID: 0, CategoryLevel: 1, CategoryLevelNo: "1", ClosedAuctionDaysBack: "7", ClosedAuctionEndingDate: time.Now().Format("1/2/2006"), HighPrice: "999999", IsWeddingCategory: "false", LowPrice: "0", Page: "1", PageSize: "40", SearchCanadaShipping: "false", SearchClosedAuctions: "false", SearchDescriptions: "false", SearchInternationalShippingOnly: "false", SearchNoPickupOnly: "false", SearchOneCentShippingOnly: "false", SearchPickupOnly: "false", SearchText: keyword, SearchUSOnlyShipping: "true", SortColumn: "1", SortDescending: "true", UseBuyerPrefs: "true"}
+}
+
+func doItemListingRequest(client *http.Client, token string, payload []byte) (*http.Response, error) {
+	req, err := http.NewRequest(http.MethodPost, itemListingURL, bytes.NewReader(payload))
+	if err != nil {
+		return nil, fmt.Errorf("could not create item listing request: %w", err)
+	}
+	setShopGoodwillHeaders(req, token)
+	req.ContentLength = int64(len(payload))
+	return client.Do(req)
+}
+
+func parseItemListingResponse(resp *http.Response) ([]listing, error) {
+	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusUnauthorized {
+		return nil, unauthorizedTokenError()
+	}
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		return nil, fmt.Errorf("item listing request failed: HTTP %d", resp.StatusCode)
+	}
+	var parsed itemListingResponse
+	if err := json.NewDecoder(resp.Body).Decode(&parsed); err != nil {
+		return nil, fmt.Errorf("could not parse item listing response: %w", err)
+	}
+	if parsed.IsUnauthorized {
+		return nil, unauthorizedTokenError()
+	}
+	return parsed.Data.Items, nil
 }
 
 func fetchFavorites(token string, timeout time.Duration) ([]favorite, error) {

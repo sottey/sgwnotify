@@ -90,6 +90,26 @@ func TestParseFavoritesResponseTreatsNoFavoritesAsEmpty(t *testing.T) {
 	}
 }
 
+func TestDefaultItemListingRequestUsesNewestFirst(t *testing.T) {
+	request := defaultItemListingRequest("watch")
+	if request.SearchText != "watch" || request.SortColumn != "1" || request.SortDescending != "true" {
+		t.Fatalf("unexpected search request: %#v", request)
+	}
+	if request.Page != "1" || request.PageSize != "40" || request.SearchUSOnlyShipping != "true" {
+		t.Fatalf("unexpected paging or shipping defaults: %#v", request)
+	}
+}
+
+func TestParseItemListingResponse(t *testing.T) {
+	items, err := parseItemListingResponse(response(http.StatusOK, `{"data":{"items":[{"itemId":2,"title":"watch","startTime":"2026-10-03T12:00:00","endTime":"2026-10-04T12:00:00"}]}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 1 || items[0].ItemID != 2 || items[0].StartTime != "2026-10-03T12:00:00" {
+		t.Fatalf("unexpected items: %#v", items)
+	}
+}
+
 func response(status int, body string) *http.Response {
 	return &http.Response{
 		StatusCode: status,

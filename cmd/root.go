@@ -136,6 +136,23 @@ func configCommand(opts *cliOptions) *cobra.Command {
 	}
 
 	configCmd.AddCommand(&cobra.Command{
+		Use:   "set-keywords <keyword>...",
+		Short: "Save keywords for newly listed items",
+		Args:  cobra.MinimumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return sgwnotify.SaveConfigKeywords(opts.configPath, args)
+		},
+	})
+
+	configCmd.AddCommand(&cobra.Command{
+		Use:   "clear-keywords",
+		Short: "Disable newly listed item keyword monitoring",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return sgwnotify.SaveConfigKeywords(opts.configPath, nil)
+		},
+	})
+
+	configCmd.AddCommand(&cobra.Command{
 		Use:   "set-token <token>",
 		Short: "Save the ShopGoodwill bearer token",
 		Args:  cobra.ExactArgs(1),

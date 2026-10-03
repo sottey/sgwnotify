@@ -13,10 +13,11 @@ import (
 )
 
 type config struct {
-	BearerToken        string `json:"bearer_token"`
-	LookaheadMinutes   int    `json:"lookahead_minutes,omitempty"`
-	OpenURL            string `json:"open_url,omitempty"`
-	HTTPTimeoutSeconds int    `json:"http_timeout_seconds,omitempty"`
+	BearerToken        string   `json:"bearer_token"`
+	LookaheadMinutes   int      `json:"lookahead_minutes,omitempty"`
+	OpenURL            string   `json:"open_url,omitempty"`
+	HTTPTimeoutSeconds int      `json:"http_timeout_seconds,omitempty"`
+	Keywords           []string `json:"keywords,omitempty"`
 }
 
 func loadConfig(path string) (config, error) {
@@ -65,6 +66,18 @@ func SaveConfigHTTPTimeoutSeconds(path string, seconds int) error {
 	return saveConfig(path, cfg)
 }
 
+func SaveConfigKeywords(path string, keywords []string) error {
+	cfg, err := loadConfig(path)
+	if err != nil {
+		return err
+	}
+	cfg.Keywords, err = normalizeKeywords(keywords)
+	if err != nil {
+		return err
+	}
+	return saveConfig(path, cfg)
+}
+
 func saveConfig(path string, cfg config) error {
 	data, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {
@@ -90,10 +103,11 @@ func ConfigOpenURL(path string, defaultOpenURL string) (string, error) {
 }
 
 type displayConfig struct {
-	BearerToken        string `json:"bearer_token"`
-	LookaheadMinutes   int    `json:"lookahead_minutes"`
-	OpenURL            string `json:"open_url"`
-	HTTPTimeoutSeconds int    `json:"http_timeout_seconds"`
+	BearerToken        string   `json:"bearer_token"`
+	LookaheadMinutes   int      `json:"lookahead_minutes"`
+	OpenURL            string   `json:"open_url"`
+	HTTPTimeoutSeconds int      `json:"http_timeout_seconds"`
+	Keywords           []string `json:"keywords"`
 }
 
 func ShowConfig(path string, defaultLookaheadMinutes int, defaultOpenURL string, defaultHTTPTimeout time.Duration, w io.Writer) error {
@@ -122,6 +136,7 @@ func ShowConfig(path string, defaultLookaheadMinutes int, defaultOpenURL string,
 		LookaheadMinutes:   lookaheadMinutes,
 		OpenURL:            openURL,
 		HTTPTimeoutSeconds: httpTimeoutSeconds,
+		Keywords:           cfg.Keywords,
 	}
 
 	data, err := json.MarshalIndent(out, "", "  ")
@@ -157,8 +172,29 @@ func ValidateConfig(path string) error {
 	if fields["http_timeout_seconds"] && cfg.HTTPTimeoutSeconds <= 0 {
 		return fmt.Errorf("http_timeout_seconds must be greater than 0")
 	}
+	if _, err := normalizeKeywords(cfg.Keywords); err != nil {
+		return err
+	}
 
 	return nil
+}
+
+func normalizeKeywords(keywords []string) ([]string, error) {
+	normalized := make([]string, 0, len(keywords))
+	seen := make(map[string]bool, len(keywords))
+	for _, keyword := range keywords {
+		keyword = strings.TrimSpace(keyword)
+		if keyword == "" {
+			return nil, fmt.Errorf("keywords must not be empty")
+		}
+		key := strings.ToLower(keyword)
+		if seen[key] {
+			return nil, fmt.Errorf("keywords must be unique")
+		}
+		seen[key] = true
+		normalized = append(normalized, keyword)
+	}
+	return normalized, nil
 }
 
 func configFields(path string) (map[string]bool, error) {

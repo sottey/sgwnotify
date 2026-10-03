@@ -29,6 +29,7 @@ No daemon, database, browser automation, or background service is required.
 ## Features
 
 - Fetches all ShopGoodwill favorites from the ShopGoodwill buyer API.
+- Searches configured keywords for newly listed items.
 - Filters favorites by auction end time.
 - Sends a single combined macOS notification.
 - Shows up to two ending favorites, plus a count of additional matches.
@@ -84,6 +85,12 @@ Set the HTTP timeout:
 ./sgwnotify config set-http-timeout-seconds 15
 ```
 
+Set keywords to monitor for new listings:
+
+```sh
+./sgwnotify config set-keywords "vintage watch" "Leica"
+```
+
 Validate config:
 
 ```sh
@@ -123,7 +130,8 @@ Example config:
   "bearer_token": "...",
   "lookahead_minutes": 120,
   "open_url": "https://shopgoodwill.com/shopgoodwill/favorites",
-  "http_timeout_seconds": 15
+  "http_timeout_seconds": 15,
+  "keywords": ["vintage watch", "Leica"]
 }
 ```
 
@@ -140,7 +148,8 @@ A favorite is considered already notified only when both the item ID and end tim
 | `bearer_token` | yes | none | ShopGoodwill API bearer token |
 | `lookahead_minutes` | no | `120` | Notify for auctions ending within this many minutes |
 | `open_url` | no | `https://shopgoodwill.com/shopgoodwill/favorites` | URL opened by clickable notifications when multiple favorites match |
-| `http_timeout_seconds` | no | `15` | Timeout for the favorites API request |
+| `http_timeout_seconds` | no | `15` | Timeout for each ShopGoodwill API request |
+| `keywords` | no | none | Terms to search for newly listed items |
 
 ## Commands
 
@@ -184,6 +193,18 @@ Save the HTTP timeout:
 
 ```sh
 ./sgwnotify config set-http-timeout-seconds 15
+```
+
+Replace the keywords monitored for new listings:
+
+```sh
+./sgwnotify config set-keywords "vintage watch" "Leica"
+```
+
+Disable keyword monitoring:
+
+```sh
+./sgwnotify config clear-keywords
 ```
 
 Validate the config file:
@@ -278,9 +299,12 @@ On each run, `sgwnotify`:
 4. Parses each favorite's auction end time.
 5. Filters favorites ending within the lookahead window.
 6. Sends one notification if any favorites match.
-7. Exits.
+7. Searches each configured keyword newest-first and notifies about newly listed matches.
+8. Exits.
 
 If no favorites are ending soon, it exits silently.
+
+Keyword monitoring establishes a quiet baseline on its first run after keywords are configured. Later runs notify only for listings whose `startTime` is newer than that successful baseline and that have not already been notified. This prevents an initial burst of alerts for existing results.
 
 If a favorite has a bad end time, that favorite is skipped. If matching favorites remain, the notification reports how many bad records were skipped.
 

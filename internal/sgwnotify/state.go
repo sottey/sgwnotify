@@ -10,7 +10,9 @@ import (
 )
 
 type notificationState struct {
-	Notified map[string]string `json:"notified"`
+	Notified             map[string]string `json:"notified"`
+	KeywordNotified      map[string]string `json:"keyword_notified,omitempty"`
+	KeywordLastCheckedAt string            `json:"keyword_last_checked_at,omitempty"`
 }
 
 func statePathForConfig(configPath string) string {
@@ -32,6 +34,9 @@ func loadNotificationState(path string) (notificationState, error) {
 	}
 	if state.Notified == nil {
 		state.Notified = map[string]string{}
+	}
+	if state.KeywordNotified == nil {
+		state.KeywordNotified = map[string]string{}
 	}
 	return state, nil
 }

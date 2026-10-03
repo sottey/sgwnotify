@@ -209,7 +209,7 @@ func TestRunRejectsBadTokenShape(t *testing.T) {
 	err := os.WriteFile(path, []byte(`{
   "bearer_token": "bad-token"
 }
-`), 0600)
+	`), 0600)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -221,5 +221,38 @@ func TestRunRejectsBadTokenShape(t *testing.T) {
 		DefaultHTTPTimeout:      15 * time.Second,
 	}); err == nil {
 		t.Fatal("expected token validation error")
+	}
+}
+
+func TestRunKeywordSearchEstablishesBaselineThenNotifiesNewListings(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.json")
+	if err := os.WriteFile(path, []byte(`{"bearer_token":"a.b.c","keywords":["watch"]}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	oldFavorites, oldListings, oldNotify, oldNow := fetchFavoritesFunc, fetchKeywordListingsFunc, notifyKeywordListingsFunc, nowFunc
+	defer func() {
+		fetchFavoritesFunc, fetchKeywordListingsFunc, notifyKeywordListingsFunc, nowFunc = oldFavorites, oldListings, oldNotify, oldNow
+	}()
+	fetchFavoritesFunc = func(string, time.Duration) ([]favorite, error) { return nil, nil }
+	currentListings := []listing{{ItemID: 1, Title: "old", StartTime: "2026-10-03T12:01:00"}}
+	fetchKeywordListingsFunc = func(string, string, time.Duration) ([]listing, error) { return currentListings, nil }
+	now := time.Date(2026, 10, 3, 12, 5, 0, 0, time.Local)
+	nowFunc = func() time.Time { return now }
+	notifications := 0
+	notifyKeywordListingsFunc = func(items []keywordListing) error { notifications += len(items); return nil }
+	opts := Options{ConfigPath: path, DefaultLookaheadMinutes: 120, DefaultOpenURL: DefaultOpenURL, DefaultHTTPTimeout: 15 * time.Second}
+	if err := Run(opts); err != nil {
+		t.Fatal(err)
+	}
+	if notifications != 0 {
+		t.Fatalf("first run notified %d", notifications)
+	}
+	currentListings = append(currentListings, listing{ItemID: 2, Title: "new", StartTime: "2026-10-03T12:06:00"})
+	now = now.Add(10 * time.Minute)
+	if err := Run(opts); err != nil {
+		t.Fatal(err)
+	}
+	if notifications != 1 {
+		t.Fatalf("notifications got %d, want 1", notifications)
 	}
 }
