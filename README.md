@@ -48,6 +48,7 @@ No daemon, database, browser automation, or background service is required.
 
 - macOS
 - Go
+- A sibling checkout of [`sgw-api`](../sgw-api); this project uses its local Go module during development.
 - A valid ShopGoodwill bearer token
 - Optional: `terminal-notifier` for clickable notifications
 
